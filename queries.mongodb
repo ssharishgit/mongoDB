@@ -1,0 +1,152 @@
+// MongoDB Task
+
+// create database for Zen class programme
+use zenprogramme;
+
+// creating collections and inserting data
+
+db.createCollection("users");
+db.createCollection("codekata");
+db.createCollection("attendance");
+db.createCollection("topics");
+db.createCollection("tasks");
+db.createCollection("company_drives");
+db.createCollection("mentors");
+
+db.users.insertMany([
+  {"user_id": 1, "user_name": "raj"},
+  {"user_id": 2, "user_name": "sai"},
+  {"user_id": 3, "user_name": "dia"},
+  {"user_id": 4, "user_name": "ram"}
+]);
+
+db.codekata.insertMany([
+  { "_id" : 1, "problemname" : "Q1", "user_id" : 1},
+  { "_id" : 2, "problemname" : "Q2", "user_id" : 3},
+  { "_id" : 3, "problemname" : "Q3", "user_id" : 2},
+  { "_id" : 4, "problemname" : "Q4", "user_id" : 4},
+  { "_id" : 5, "problemname" : "Q5", "user_id" : 1},
+  { "_id" : 6, "problemname" : "Q5", "user_id" : 2},
+]);
+
+db.attendance.insertMany([
+  {"user_id": 1, "present": true, "appearedFor":"abc", attendanceDate: new Date("2020-10-15")},
+  {"user_id": 2, "present": true, "appearedFor":"def", attendanceDate: new Date("2020-10-25")},
+  {"user_id": 3, "present": false, attendanceDate: new Date("2020-10-05")},
+  {"user_id": 4, "present": false, attendanceDate: new Date("2020-10-29")},
+]);
+
+db.tasks.insertMany([
+    { "user_id": 1, "taskName": "task1", "topicName": "FSD", "submitted": true, submissionDate: new Date("2020-10-25")},
+    { "user_id": 2, "taskName": "task2", "topicName": "AWS", "submitted": true, submissionDate: new Date("2020-10-15")},
+    { "user_id": 3, "taskName": "task3", "topicName": "CSS", "submitted": false, submissionDate: new Date("2020-10-30")},
+    { "user_id": 4, "taskName": "task4", "topicName": "VUE", "submitted": false, submissionDate: new Date("2020-10-22")},
+]);
+
+db.topics.insertMany([
+  {"name" : "AWS", "topicDate": new Date("2024-10-11")},
+  {"name" : "FSD", "topicDate": new Date("2024-10-18")},
+  {"name" : "VUE", "topicDate": new Date("2024-11-01")},
+  {"name" : "CSS", "topicDate": new Date("2024-10-30")},
+]);
+
+db.company_drives.insertMany([
+  {"companyname" : "abc", "user_id" : 1,"driveDate": new Date("2020-10-01")},
+  {"companyname" : "def", "user_id" : 2,"driveDate": new Date("2020-10-11")},
+  {"companyname" : "ghi", "user_id" : 3,"driveDate": new Date("2020-10-17")},
+  {"companyname" : "jkl", "user_id" : 1,"driveDate": new Date("2020-10-21")},
+  {"companyname" : "mno", "user_id" : 4,"driveDate": new Date("2020-10-31")},
+]);
+
+db.mentors.insertMany([
+  { "_id" : 1, "name" : "dev", "mentee_count" : 10, "batch" : "October"},
+  { "_id" : 2, "name" : "ram", "mentee_count" : 20, "batch" : "October"},
+  { "_id" : 3, "name" : "sam", "mentee_count" : 30, "batch" : "August"},
+  { "_id" : 4, "name" : "ben", "mentee_count" : 25, "batch" : "September"},
+  { "_id" : 5, "name" : "ali", "mentee_count" : 15, "batch" : "November"},
+]);
+
+
+
+// Find all the topics and tasks which are thought in the month of October
+db.topics.aggregate([
+  {
+    $match: {
+      "topicDate" : {$gte:new Date("2024-10-01"), $lte:new Date("2024-10-31")}
+    }
+  },
+  {
+    $lookup: {
+      from: "tasks",
+      localField: "name",
+      foreignField: "topicName",
+      as: "tasksdetails"
+    }
+  },
+  { $project: {"name": 1, "topicDate":1, "tasksdetails.taskName": 1,_id:0}  }
+]);
+
+// Find all the company drives which appeared between 15 oct-2020 and 31-oct-2020
+db.company_drives.find({ "driveDate": { $gte: new Date("2020-10-15"), $lte: new Date("2020-10-31") } });
+
+// Find all the company drives and students who are appeared for the placement
+db.company_drives.aggregate([
+  {
+    $lookup: {
+      from: "attendance",
+      localField: "companyname",
+      foreignField: "appearedFor",
+      as: "companyDetails"
+    }
+  },
+  {
+    $unwind: "$companyDetails"
+  },
+  {
+    $lookup: {
+      from : "users",
+      localField: "companyDetails.user_id",
+      foreignField: "user_id",
+      as: "userDetails"
+    }
+  },
+  { 
+    $project: {
+      companyname:1,
+      "userDetails.user_name":1,
+      driveDate: 1
+    } 
+  }
+]);
+
+//Find the number of problems solved by the user in codekata
+db.codekata.aggregate([ { $group: { _id: "$user_id", problemsSolved: { $count: {} } } }] );
+
+//Find all the mentors with who has the mentee's count more than 15
+db.mentors.find({"mentee_count": {$gt:15} });
+
+//Find the number of users who are absent and task is not submitted  between 15 oct-2020 and 31-oct-2020
+
+db.attendance.aggregate([
+  {
+    $lookup: {
+      from: "tasks",
+      localField: "user_id",
+      foreignField: "user_id",
+      as: "tasksDetails"
+    }
+  },
+  {
+    $match: {
+      "present": false,
+      "tasksDetails.submitted": false,
+      "tasksDetails.submissionDate": { $gte: new Date("2020-10-15"), $lte: new Date("2020-10-31") }
+    }
+  },
+  {
+    $group: {
+      _id: "$user_id",
+      totalcount: { $sum: 1 }
+    }
+  }
+]);
